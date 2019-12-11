@@ -105,3 +105,8 @@ venv.bak/
 
 .vs
 .vscode
+.idea
+
+# test files
+/test/test
+/test/test.omex
