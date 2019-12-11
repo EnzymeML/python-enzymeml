@@ -1,12 +1,25 @@
 import libsbml as sbml
 import libcombine as combine
-import enzymeml.enzymemlkey as key
+try:
+    import enzymeml.enzymemlkey as key
+except ImportError:
+    from . import enzymemlkey as key
 import xml.etree.ElementTree as ET
 from datetime import datetime as time
-import enzymeml.ontologymanager as ontology
+try:
+    import enzymeml.ontologymanager as ontology
+except ImportError:
+    from . import ontologymanager as ontology
 import traceback
 import decimal
-import os, shutil
+import os, shutil, sys
+
+if sys.version_info[0] == 2:
+    import errno
+
+    class FileExistsError(OSError):
+        def __init__(self, msg):
+            super(FileExistsError, self).__init__(errno.EEXIST, msg)
 
 DEBUG = True
 
@@ -464,21 +477,21 @@ class EnzymeMLColumn:
 
 class EnzymeMLColumnUnitowner(EnzymeMLColumn):
     def __init__(self, ct, unit, text=None):
-        super().__init__(ct, text)
+        EnzymeMLColumn.__init__(ct, text)
         self.unit = unit
 
     def has_unit(self):
         return True
 
     def to_element(self, column_nr):
-        el = super().to_element(column_nr)
+        el = EnzymeMLColumn.to_element(column_nr)
         el.set("unit", str(_get_id(self.unit)))
         return el
 
 
 class EnzymeMLColumnConcentration(EnzymeMLColumnUnitowner):
     def __init__(self, ct, unit, species, repl=None, text=None):
-        super().__init__(ct, unit, text)
+        EnzymeMLColumnUnitowner.__init__(ct, unit, text)
         self.species = species
         self.replica = repl
 
@@ -486,7 +499,7 @@ class EnzymeMLColumnConcentration(EnzymeMLColumnUnitowner):
         return True
 
     def to_element(self, column_nr):
-        el = super().to_element(column_nr)
+        el = EnzymeMLColumnUnitowner.to_element(column_nr)
         el.set("species", str(_get_id(self.species)))
         el.set("replica", str(_get_id(self.replica)))
         return el
@@ -494,14 +507,14 @@ class EnzymeMLColumnConcentration(EnzymeMLColumnUnitowner):
 
 class EnzymeMLColumnEmpty(EnzymeMLColumn):
     def __init__(self, amount=None, text=None):
-        super().__init__(COLUMN_TYPE_EMPTY, text)
+        EnzymeMLColumn.__init__(COLUMN_TYPE_EMPTY, text)
         self.amount = amount
 
     def get_amount(self):
         return 1 if self.amount is None else self.amount
 
     def to_element(self, column_nr):
-        el = super().to_element(column_nr)
+        el = EnzymeMLColumn.to_element(column_nr)
         if self.amount is not None:
             el.set("amount", str(self.amount))
             return el
