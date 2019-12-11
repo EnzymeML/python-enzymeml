@@ -22,6 +22,7 @@ if sys.version_info[0] == 2:
             super(FileExistsError, self).__init__(errno.EEXIST, msg)
 
 DEBUG = True
+have_distrib = sbml.SBMLExtensionRegistry.getInstance().isRegistered('distrib')
 
 
 def namespace():
@@ -453,7 +454,7 @@ COLUMN_TYPE_CONCENTRATION = "conc"
 COLUMN_TYPE_EMPTY = "empty"
 
 
-class EnzymeMLColumn:
+class EnzymeMLColumn(object):
     def __init__(self, ct, text=None):
         self.type = ct
         self.text = text
@@ -477,21 +478,21 @@ class EnzymeMLColumn:
 
 class EnzymeMLColumnUnitowner(EnzymeMLColumn):
     def __init__(self, ct, unit, text=None):
-        EnzymeMLColumn.__init__(ct, text)
+        EnzymeMLColumn.__init__(self, ct, text)
         self.unit = unit
 
     def has_unit(self):
         return True
 
     def to_element(self, column_nr):
-        el = EnzymeMLColumn.to_element(column_nr)
+        el = EnzymeMLColumn.to_element(self, column_nr)
         el.set("unit", str(_get_id(self.unit)))
         return el
 
 
 class EnzymeMLColumnConcentration(EnzymeMLColumnUnitowner):
     def __init__(self, ct, unit, species, repl=None, text=None):
-        EnzymeMLColumnUnitowner.__init__(ct, unit, text)
+        EnzymeMLColumnUnitowner.__init__(self, ct, unit, text)
         self.species = species
         self.replica = repl
 
@@ -499,7 +500,7 @@ class EnzymeMLColumnConcentration(EnzymeMLColumnUnitowner):
         return True
 
     def to_element(self, column_nr):
-        el = EnzymeMLColumnUnitowner.to_element(column_nr)
+        el = EnzymeMLColumnUnitowner.to_element(self, column_nr)
         el.set("species", str(_get_id(self.species)))
         el.set("replica", str(_get_id(self.replica)))
         return el
@@ -507,14 +508,14 @@ class EnzymeMLColumnConcentration(EnzymeMLColumnUnitowner):
 
 class EnzymeMLColumnEmpty(EnzymeMLColumn):
     def __init__(self, amount=None, text=None):
-        EnzymeMLColumn.__init__(COLUMN_TYPE_EMPTY, text)
+        EnzymeMLColumn.__init__(self, COLUMN_TYPE_EMPTY, text)
         self.amount = amount
 
     def get_amount(self):
         return 1 if self.amount is None else self.amount
 
     def to_element(self, column_nr):
-        el = EnzymeMLColumn.to_element(column_nr)
+        el = EnzymeMLColumn.to_element(self, column_nr)
         if self.amount is not None:
             el.set("amount", str(self.amount))
             return el
@@ -1276,7 +1277,10 @@ class EnzymeMLCSV:
 
 # This function should be used to create the experiment sbml file
 def _create_experiment_sbml_document():
-    sbmlns = sbml.SBMLNamespaces(3, 2, "distrib", 1)
+    if have_distrib:
+        sbmlns = sbml.SBMLNamespaces(3, 2, "distrib", 1)
+    else:
+        sbmlns = sbml.SBMLNamespaces(3, 2)
     doc = sbml.SBMLDocument(sbmlns)
     doc.setPackageRequired("distrib", True)
     model = doc.createModel()
@@ -1287,7 +1291,7 @@ def _create_experiment_sbml_document():
 
 
 def _load_experiment_sbml_document(exdoc):
-    if not exdoc.getPackageRequired("distrib"):
+    if have_distrib and not exdoc.getPackageRequired("distrib"):
         exdoc.enablePackage(sbml.DistribExtension.getXmlnsL3V1V1(), "distrib", True)
 
     if not exdoc.isSetModel():
@@ -1761,7 +1765,7 @@ def __main_species(enzymeml, ident, obj):
     else:
         sp_def.setBoundaryCondition(False)
 
-    if "stdev" in obj and obj["stdev"] is not None:
+    if have_distrib and ("stdev" in obj and obj["stdev"] is not None):
         distrib = sp_def.getPlugin("distrib")
         unc = distrib.createUncertainty()
         unc_para = unc.createUncertParameter()
@@ -2150,7 +2154,7 @@ def __model_reaction_parameters(enzymeml, ident, obj):
     lp.setValue(obj["value"])
     lp.setUnits(_get_id(obj["units"]))
 
-    if "stdev" in obj:
+    if have_distrib and "stdev" in obj:
         stdev = obj["stdev"]
 
         value = None
